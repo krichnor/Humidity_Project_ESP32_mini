@@ -2,7 +2,7 @@
 #include <DHT.h>      // Library DHT-sensor-library-master.zip
 
 //////////  Sensor NAME  //////////
-const char* SensorName     = "krich";
+const char* SensorName     = "krich/garden01";
 
 #define hue_sensor_pin 36
 int output_value ;
