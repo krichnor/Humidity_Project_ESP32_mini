@@ -3,8 +3,7 @@
 
 //////////  Sensor NAME  //////////
 const char* SensorName     = "krich";
-//////////  Initialize the OLED display using Wire library
-SSD1306  display(0x3c, 5, 4);
+
 #define hue_sensor_pin 36
 int output_value ;
 
@@ -28,7 +27,7 @@ void TempSensorReadDisplay();
 ////////// KBTG Greeting init variables //////////
 int Device_state = -2;   //1st WifiConnect= 0, reconWIFI >1
 int Device_state_prev = 0;
-void KBTGGreeting();
+
 
 ////////// WIFI & MQTT Header //////////
 #include <WiFi.h>
@@ -78,7 +77,6 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 void setup() {
   dht.begin();
   Serial.begin(115200);
-  KBTGGreeting();
   
   ////////// WIFI chacking and setting up ////////////
   if (WiFi.status() != WL_CONNECTED) {
@@ -110,7 +108,7 @@ void loop() {
   }
 
                 
-  //TempSensorReadDisplay();
+ 
   
   Serial.print("Device_state = ");
   Serial.println(Device_state);
@@ -137,7 +135,7 @@ void loop() {
 
   // Soil Humidity part
   output_value= analogRead(hue_sensor_pin);
-  output_value = map(output_value,1535,700,0,100);
+  output_value = map(output_value,1620,160,0,100);
   if(output_value >100){
     output_value =100;
   }
@@ -146,7 +144,7 @@ void loop() {
   Serial.println("%");
   Serial.print("Analog value = ");
   Serial.println(analogRead(hue_sensor_pin));
-  dtostrf(analogRead(hue_sensor_pin),6,2,SoilHumid);
+  dtostrf(output_value,6,2,SoilHumid);
   // Soil Humidity part.
 
   Publish_Soil_Humidity();
@@ -155,25 +153,6 @@ void loop() {
 }
 /*---------------------------- SUB FUNCTION ----------------------------*/
 
-///////// KBTG Greeting message /////////
-void KBTGGreeting()
-{
-  if (Device_state < -1) {
-    ///////// Initial OLED /////////
-    display.init();
-    display.flipScreenVertically();
-    display.clear();
-    display.setColor(WHITE);
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.setFont(ArialMT_Plain_16);
-    display.drawString(64, 10, "Wecome to");
-    display.setFont(ArialMT_Plain_24);
-    display.drawString(64, 30, "KBTG IoT");
-    display.display();
-    Device_state = -1;
-    delay(2000);    // Greeting meessage will be display only one time.
-  }
-}
 
 void WIFIconnect()
 {
@@ -183,17 +162,8 @@ void WIFIconnect()
   Serial.print("Connecting to WiFi..");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
+    Serial.println("Connecting to WiFi...");
     Serial.print(".");
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "KBTG IoT:");
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.setFont(ArialMT_Plain_10);
-    display.drawString(128, 20, "Temperature Sensor Proj.");
-    display.drawString(128, 35, "Connecting to WiFi...");
-    display.drawString(128, 50, "SSID: " + String(ssid));
-    display.display();
     if ((millis() / 1000) > mytimeout + 4) { // try for less than 4 seconds to connect to WiFi router
       break;
     }
@@ -208,16 +178,7 @@ void WIFIconnect()
     Serial.println(Statuses[WiFi.status()]);  //Show WIFI connection status error
   } else {
     Serial.println("Connected to the WiFi network");
-    display.clear();
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "KBTG IoT:");
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.setFont(ArialMT_Plain_10);
-    display.drawString(128, 20, "Temperature Sensor Proj.");
-    display.drawString(128, 35, "Connected to WiFi: Done");
-    display.drawString(128, 50, "SSID: " + String(ssid));
-    display.display();
+    Serial.println("Connected to WiFi: Done");
     Device_state ++;
   }
 }
@@ -231,131 +192,23 @@ void MQTTconnect() {
     Serial.println("Connecting to MQTT...");
     if (client.connect("ESP32Client", mqttUser, mqttPassword )) {
       Serial.println(" Connected to MQTT: Done");
-      display.clear();
-      display.setTextAlignment(TEXT_ALIGN_LEFT);
-      display.setFont(ArialMT_Plain_16);
-      display.drawString(0, 0, "KBTG IoT:");
-      display.setTextAlignment(TEXT_ALIGN_RIGHT);
-      display.setFont(ArialMT_Plain_10);
-      display.drawString(128, 20, "Temperature Sensor Proj.");
-      display.drawString(128, 35, "Connected MQTT: Done");
-      display.drawString(128, 50, "SSID: " + String(ssid));
-      display.display();
+      Serial.println("KBTG IoT:");
+      Serial.println("Temperature Sensor Proj.");
+      Serial.println("Connected MQTT: Done");
+      Serial.println("SSID: " + String(ssid));
     } else {
       Serial.print("failed with state ");
       Serial.print(client.state());
-      display.clear();
-      display.setTextAlignment(TEXT_ALIGN_LEFT);
-      display.setFont(ArialMT_Plain_16);
-      display.drawString(0, 0, "KBTG IoT:");
-      display.setTextAlignment(TEXT_ALIGN_RIGHT);
-      display.setFont(ArialMT_Plain_10);
-      display.drawString(128, 20, "Temperature Sensor Proj.");
-      display.drawString(128, 35, "Connecting to MQTT");
-      display.drawString(128, 50, "SSID: " + String(ssid));
-      display.display();
+      Serial.println("KBTG IoT:");
+      Serial.println("Temperature Sensor Proj.");
+      Serial.println("Connecting to MQTT");
+      Serial.println("SSID: " + String(ssid));
       delay(1000);  //Re-connecting in a minute
     }
   }
   client.disconnect();
 }
 
-void TempSensorReadDisplay()
-{
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
-  // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
-  // Read temperature as Fahrenheit (isFahrenheit = true)
-  float f = dht.readTemperature(true);
-
-  // Check if any reads failed and exit early (to try again).
-  Serial.println();
-  Serial.println("==========================");
-  Serial.println("Temp value on pin 25 is ");
-  if (isnan(h) || isnan(t) || isnan(f)) {
-    Serial.println("Failed to read from DHT sensor!");
-    // Display Sensor Value to OLED display //
-    display.clear();
-    display.setColor(WHITE);
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_16);
-    display.drawString(0, 0, "KBTG IoT: Temp.");
-    display.setFont(ArialMT_Plain_10);
-    display.drawString(0, 20, "DHT sensor cannot be read");
-    display.drawString(0, 35, "Please checking connector");
-    display.drawString(0, 50, "and sensor.");
-    display.display();
-    return;
-  }
-
-  // Compute heat index in Celsius (isFahreheit = false)
-  float hic = dht.computeHeatIndex(t, h, false);
-
-  // Display Sensor Value to COM port //
-  sprintf (charSensorDisplay, "   Temperature: %2.2f *C ", t);
-  Serial.println(charSensorDisplay);
-  sprintf (charSensorDisplay, "      Humidity: %2.2f  %% ", h);
-  Serial.println(charSensorDisplay);
-  sprintf (charSensorDisplay, "   Temperature: %2.2f *C ", hic);
-  Serial.println(charSensorDisplay);
-  Serial.println("==========================");
-
-  // Display Sensor Value to OLED display //
-  display.clear();
-  display.setColor(WHITE);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(0, 0, "KBTG IoT: Temp.");
-  display.setTextAlignment(TEXT_ALIGN_RIGHT);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(120, 20, "Temperature: " + String(t) + " *C");
-  display.drawString(120, 35, "Humidity: " + String(h) + "  %");
-  display.drawString(120, 50, "Heat index: " + String(hic) + " *C");
-
-  display.display();
-
-  client.loop();
-  dtostrf(t, 6, 2, celsiusTemp);
-  dtostrf(h, 6, 2, humidityTemp);
-  dtostrf(hic, 6, 2, HIndTemp);
-
-  ////////// Publish MQTT data ////////////
-  if (WiFi.status() == WL_CONNECTED) {
-    if (client.connect("ESP32Client", mqttUser, mqttPassword )) {
-      sprintf (charDateTime, "%02d:%02d:%02d %02d/%02d/%04d", hour(), minute(), second(), day(), month(), year());
-      sprintf (MQtopic, "%s/Temp", SensorName);
-      client.publish(MQtopic, celsiusTemp);
-      sprintf (MQtopic, "%s/Hue", SensorName);
-      client.publish(MQtopic, humidityTemp);
-      sprintf (MQtopic, "%s/HInd", SensorName);
-      client.publish(MQtopic, HIndTemp);
-      if (Device_state < 1) {
-        sprintf (MQtopic, "%s/TimeBoot", SensorName);
-        client.publish(MQtopic, charDateTime);
-        Device_state ++;
-        Device_state_prev = Device_state;
-        Serial.print("After stamp boot time, change Device_state to ");
-        Serial.println(Device_state);
-      } else if (Device_state != Device_state_prev) {
-        sprintf (MQtopic, "%s/TimeReconWIFI", SensorName);
-        client.publish(MQtopic, charDateTime);
-        sprintf (charDateTime, "%i", Device_state);
-        sprintf (MQtopic, "%s/TimeReconTime", SensorName);
-        client.publish(MQtopic, charDateTime);
-        Device_state_prev = Device_state;
-      } else {
-        sprintf (MQtopic, "%s/TimeStamp", SensorName);
-        client.publish(MQtopic, charDateTime);
-        client.disconnect();
-      }
-    } else {
-        Serial.println("Connecting to MQTT");
-        Serial.print("failed with state ");
-        Serial.print(client.state());
-    }
-  }  
-}
 
  
 void Publish_Soil_Humidity() {
