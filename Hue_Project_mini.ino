@@ -1,30 +1,13 @@
-#include "SSD1306.h" 
-#include <DHT.h>      // Library DHT-sensor-library-master.zip
-
 //////////  Sensor NAME  //////////
 const char* SensorName     = "krich/garden01";
 
 #define hue_sensor_pin 36
 int output_value ;
-
-
-//////////  DHT Setting // for Temperature sensor type DHT11
-#define DHTTYPE DHT11 // Library DHT-sensor-library-master.zip
-#define DHTPIN 2     // Library DHT-sensor-library-master.zip
-DHT dht(DHTPIN, DHTTYPE);
-
-// Temporary variables // for Temperature sensor type DHT11
-static char celsiusTemp[7];
-static char humidityTemp[7];
-static char HIndTemp[7];
 static char SoilHumid[7];
-char charSensorDisplay[30];   //Buffer to display message
+static char SoilAnalog[7];
+static char UpTime[7];
 
-int sensorPin = 36;   // select the input pin for DHT11
-int sensorValue = 0;  // variable to store the value coming from the sensor
-void TempSensorReadDisplay();
-
-////////// KBTG Greeting init variables //////////
+////////// init variables //////////
 int Device_state = -2;   //1st WifiConnect= 0, reconWIFI >1
 int Device_state_prev = 0;
 
@@ -75,7 +58,6 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 
 void setup() {
-  dht.begin();
   Serial.begin(115200);
   
   ////////// WIFI chacking and setting up ////////////
@@ -84,17 +66,6 @@ void setup() {
   }
   if (WiFi.status() == WL_CONNECTED) {
     MQTTconnect();    //MQTT setup
-    ////////// NTP chacking and setting up ////////////
-    if (timeStatus() != timeSet) {
-      Serial.print("Start NTP Setup Process");
-      setSyncProvider(getNtpTime);
-      setSyncInterval(300);
-      if (timeStatus() == timeSet) { //update the display only if time has changed
-        Serial.print("NTP Time is set -> ");
-        sprintf (charDateTime, "%02d:%02d:%02d %02d/%02d/%04d", hour(), minute(), second(), day(), month(), year());
-        Serial.println(charDateTime);
-      }
-    }
   }
 
   Serial.println("Reading From the Soil Humidity Sensor ...");
@@ -107,35 +78,16 @@ void loop() {
     setup();
   }
 
-                
- 
-  
   Serial.print("Device_state = ");
   Serial.println(Device_state);
 
   Serial.print("Device_state_prev = ");
   Serial.println(Device_state_prev);
 
-  ////////// Show NTS if not set ////////////
-  if (timeStatus() == timeNotSet) {
-    Serial.println("NTP Time is not set");
-  }
-  /*  ////////// Show Date -  ////////////
-    if (timeStatus() != timeNotSet) {
-      if (now() != prevDisplay) { //update the display only if time has changed
-        prevDisplay = now();
-        Serial.print("Time stamp from NTP -> ");
-        digitalClockDisplay();
-        Serial.println();
-      }
-    }   */
-
-  
-    
-
   // Soil Humidity part
   output_value= analogRead(hue_sensor_pin);
   output_value = map(output_value,1620,160,0,100);
+  double analog_value = analogRead(hue_sensor_pin);
   if(output_value >100){
     output_value =100;
   }
@@ -143,8 +95,9 @@ void loop() {
   Serial.print(output_value);
   Serial.println("%");
   Serial.print("Analog value = ");
-  Serial.println(analogRead(hue_sensor_pin));
+  Serial.println(analog_value);
   dtostrf(output_value,6,2,SoilHumid);
+  dtostrf(analog_value,6,2,SoilAnalog);
   // Soil Humidity part.
 
   Publish_Soil_Humidity();
@@ -159,10 +112,9 @@ void WIFIconnect()
   int mytimeout = millis() / 1000;
   WiFi.begin(ssid, password);
   Serial.println();
-  Serial.print("Connecting to WiFi..");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.println("Connecting to WiFi...");
+    Serial.print("Connecting to WiFi...");
     Serial.print(".");
     if ((millis() / 1000) > mytimeout + 4) { // try for less than 4 seconds to connect to WiFi router
       break;
@@ -215,95 +167,24 @@ void Publish_Soil_Humidity() {
   ////////// Publish MQTT data ////////////
   if (WiFi.status() == WL_CONNECTED) {
     if (client.connect("ESP32Client", mqttUser, mqttPassword )) {
-      sprintf (charDateTime, "%02d:%02d:%02d %02d/%02d/%04d", hour(), minute(), second(), day(), month(), year());
-      //sprintf (MQtopic, "%s/Temp", SensorName);
-      //client.publish(MQtopic, celsiusTemp);
-      //sprintf (MQtopic, "%s/Hue", SensorName);
-      //client.publish(MQtopic, humidityTemp);
-      //sprintf (MQtopic, "%s/HInd", SensorName);
-      //client.publish(MQtopic, HIndTemp);
       sprintf (MQtopic, "%s/SoilHumid", SensorName);
-     // dtostrf(hic, 6, 2, HIndTemp);
       client.publish(MQtopic,SoilHumid);
-      if (Device_state < 1) {
-        sprintf (MQtopic, "%s/TimeBoot", SensorName);
-        client.publish(MQtopic, charDateTime);
-        Device_state ++;
-        Device_state_prev = Device_state;
-        Serial.print("After stamp boot time, change Device_state to ");
-        Serial.println(Device_state);
-      } else if (Device_state != Device_state_prev) {
-        sprintf (MQtopic, "%s/TimeReconWIFI", SensorName);
-        client.publish(MQtopic, charDateTime);
-        sprintf (charDateTime, "%i", Device_state);
-        sprintf (MQtopic, "%s/TimeReconTime", SensorName);
-        client.publish(MQtopic, charDateTime);
-        Device_state_prev = Device_state;
-      } else {
-        sprintf (MQtopic, "%s/TimeStamp", SensorName);
-        client.publish(MQtopic, charDateTime);
-        client.disconnect();
-      }
+      sprintf(MQtopic,"%s/SoilAnalog", SensorName);
+      client.publish(MQtopic,SoilAnalog);
+      
+      dtostrf(millis()/1000,6,2,UpTime);
+      sprintf(MQtopic,"%s/UpTime_r", SensorName);
+      client.publish(MQtopic,UpTime,true);
+      
+      sprintf(MQtopic,"%s/UpTime", SensorName);
+      client.publish(MQtopic,UpTime);
+      
+
+      
     } else {
         Serial.println("Connecting to MQTT");
         Serial.print("failed with state ");
         Serial.print(client.state());
     }
   }
-}
-
-
-/*-------- NTP code ----------*/
-time_t getNtpTime()
-{
-  IPAddress ntpServerIP; // NTP server's ip address
-
-  while (ntpUDP.parsePacket() > 0) ; // discard any previously received packets
-  Serial.println("Transmit NTP Request");
-  // get a random server from the pool
-  WiFi.hostByName(ntpServerName, ntpServerIP);
-  Serial.print(ntpServerName);
-  Serial.print(": ");
-  Serial.println(ntpServerIP);
-  sendNTPpacket(ntpServerIP);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500) {
-    int size = ntpUDP.parsePacket();
-    if (size >= NTP_PACKET_SIZE) {
-      Serial.println("Receive NTP Response");
-      ntpUDP.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + timeZone * SECS_PER_HOUR;
-    }
-  }
-  Serial.println("No NTP Response :-(");
-  return 0; // return 0 if unable to get the time
-}
-
-// send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
-{
-  // set all bytes in the buffer to 0
-  memset(packetBuffer, 0, NTP_PACKET_SIZE);
-  // Initialize values needed to form NTP request
-  // (see URL above for details on the packets)
-  packetBuffer[0] = 0b11100011;   // LI, Version, Mode
-  packetBuffer[1] = 0;     // Stratum, or type of clock
-  packetBuffer[2] = 6;     // Polling Interval
-  packetBuffer[3] = 0xEC;  // Peer Clock Precision
-  // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12] = 49;
-  packetBuffer[13] = 0x4E;
-  packetBuffer[14] = 49;
-  packetBuffer[15] = 52;
-  // all NTP fields have been given values, now
-  // you can send a packet requesting a timestamp:
-  ntpUDP.beginPacket(address, 123); //NTP requests are to port 123
-  ntpUDP.write(packetBuffer, NTP_PACKET_SIZE);
-  ntpUDP.endPacket();
 }
