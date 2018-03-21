@@ -1,11 +1,14 @@
 //////////  Sensor NAME  //////////
-const char* SensorName     = "krich/garden01";
+// For my Raspberry Pi
+//const char* SensorName     = "krich/garden02";
+// For Ubidots
+const char* SensorName     = "/v1.6/devices/5ab1e966c03f9733ab070024";
 
-#define hue_sensor_pin 36
-int output_value ;
-static char SoilHumid[7];
-static char SoilAnalog[7];
-static char UpTime[7];
+#define hue_sensor_pin 36  // ADC00
+static char SoilHumid[8];
+static char SoilAnalog[8];
+static char UpTime[8];
+static char testchar[8];
 
 ////////// init variables //////////
 int Device_state = -2;   //1st WifiConnect= 0, reconWIFI >1
@@ -24,10 +27,17 @@ WiFiClient espClient;
 void WIFIconnect();
 
 ////////// MQTT Setting //////////
-const char* mqttServer = "192.168.1.40";
+// For my raspberry PI
+//const char* mqttServer = "192.168.1.40";
+//const int mqttPort = 1883;
+//const char* mqttUser = "ESP32";
+//const char* mqttPassword = "khunkrich";
+// For Ubidots 
+const char* mqttServer = "things.ubidots.com";
 const int mqttPort = 1883;
-const char* mqttUser = "ESP32";
-const char* mqttPassword = "khunkrich";
+const char* mqttUser = "A1E-c0gPMPmIlP9VC0KBj4OkQu8LVexXHu";
+const char* mqttPassword = "";
+
 PubSubClient client(espClient);
 String getMessage;
 char MQtopic[50];
@@ -60,6 +70,10 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 void setup() {
   Serial.begin(115200);
   
+  analogReadResolution(13);
+  delay(1000);
+  analogRead(hue_sensor_pin);
+  
   ////////// WIFI chacking and setting up ////////////
   if (WiFi.status() != WL_CONNECTED) {
     WIFIconnect();
@@ -85,20 +99,24 @@ void loop() {
   Serial.println(Device_state_prev);
 
   // Soil Humidity part
-  output_value= analogRead(hue_sensor_pin);
-  output_value = map(output_value,1620,160,0,100);
-  double analog_value = analogRead(hue_sensor_pin);
-  if(output_value >100){
-    output_value =100;
+  double output_value= analogRead(hue_sensor_pin);
+  double analog_value = output_value;
+  
+  //float output_value_map = mapfloat(output_value,1620,160,0,100);   // for ESP32
+  float output_value_map = mapfloat(output_value,2000,160,0,100);   // for LOLIN32-OLED
+
+  
+  if(output_value_map >100){
+    output_value_map =100;
   }
   Serial.print("Mositure : ");
-  Serial.print(output_value);
+  Serial.print(output_value_map);
   Serial.println("%");
   Serial.print("Analog value = ");
   Serial.println(analog_value);
-  dtostrf(output_value,6,2,SoilHumid);
+  //sprintf(SoilHumid,"%f",output_value);
   dtostrf(analog_value,6,2,SoilAnalog);
-  // Soil Humidity part.
+  dtostrf(output_value_map,6,2,SoilHumid);
 
   Publish_Soil_Humidity();
 
@@ -188,3 +206,9 @@ void Publish_Soil_Humidity() {
     }
   }
 }
+
+float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
+{
+ return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
+}
+
