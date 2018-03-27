@@ -1,13 +1,14 @@
 //////////  Sensor NAME  //////////
 // For my Raspberry Pi
-//const char* SensorName     = "krich/garden02";
+//const char* SensorName     = "krich/garden01";
 // For Ubidots
 const char* SensorName     = "/v1.6/devices/5ab1e966c03f9733ab070024";
 
 #define hue_sensor_pin 36  // ADC00
+#define hue_ref_pin 39//SVN
 static char SoilHumid[8];
-static char SoilAnalog[8];
-static char UpTime[8];
+static char SoilAnalogs[8];
+static char UpTime[10];
 static char testchar[8];
 
 ////////// init variables //////////
@@ -28,7 +29,7 @@ void WIFIconnect();
 
 ////////// MQTT Setting //////////
 // For my raspberry PI
-//const char* mqttServer = "192.168.1.40";
+//const char* mqttServer = "192.168.1.38";
 //const int mqttPort = 1883;
 //const char* mqttUser = "ESP32";
 //const char* mqttPassword = "khunkrich";
@@ -49,6 +50,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
     getMessage = getMessage + (char)payload[i];
   }
+  Serial.print("Hello message : ");
   Serial.println(getMessage);
 }
 
@@ -99,27 +101,38 @@ void loop() {
   Serial.println(Device_state_prev);
 
   // Soil Humidity part
-  double output_value= analogRead(hue_sensor_pin);
+  double output_value = analogRead(hue_sensor_pin);
+  double ref_read = map(analogRead(hue_ref_pin),5730,0,5730,8190);
+  
+  float output_value_map= mapfloat(output_value,ref_read,0,0,100); //Map with refference voltage
+  
   double analog_value = output_value;
   
-  //float output_value_map = mapfloat(output_value,1620,160,0,100);   // for ESP32
-  float output_value_map = mapfloat(output_value,2000,160,0,100);   // for LOLIN32-OLED
-
+  //float output_value_map = mapfloat(output_value,3280,160,0,100);   // for ESP32
+  //float output_value_map = mapfloat(output_value,2500,160,0,100);   // for LOLIN32-OLED
   
-  if(output_value_map >100){
-    output_value_map =100;
-  }
+  
+//  if(output_value_map >100){
+//    output_value_map =100;
+//  }
   Serial.print("Mositure : ");
   Serial.print(output_value_map);
   Serial.println("%");
   Serial.print("Analog value = ");
   Serial.println(analog_value);
   //sprintf(SoilHumid,"%f",output_value);
-  dtostrf(analog_value,6,2,SoilAnalog);
+  dtostrf(analog_value,6,2,SoilAnalogs);
   dtostrf(output_value_map,6,2,SoilHumid);
 
+
+  Serial.print("Analog Ref = ");
+  Serial.println(ref_read);
+
+
+  
   Publish_Soil_Humidity();
 
+  
   delay(10000); // 10 sec interval loop
 }
 /*---------------------------- SUB FUNCTION ----------------------------*/
@@ -188,16 +201,18 @@ void Publish_Soil_Humidity() {
       sprintf (MQtopic, "%s/SoilHumid", SensorName);
       client.publish(MQtopic,SoilHumid);
       sprintf(MQtopic,"%s/SoilAnalog", SensorName);
-      client.publish(MQtopic,SoilAnalog);
+      client.publish(MQtopic,SoilAnalogs);
       
-      dtostrf(millis()/1000,6,2,UpTime);
+      dtostrf(millis()/1000,8,2,UpTime);
       sprintf(MQtopic,"%s/UpTime_r", SensorName);
       client.publish(MQtopic,UpTime,true);
       
       sprintf(MQtopic,"%s/UpTime", SensorName);
       client.publish(MQtopic,UpTime);
+      Serial.print("Uptime = ");
+      Serial.println(UpTime);
       
-
+      client.subscribe("/v1.6/devices/5ab1e966c03f9733ab070024/getmsg");
       
     } else {
         Serial.println("Connecting to MQTT");
@@ -211,4 +226,5 @@ float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
 {
  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
 }
+
 
